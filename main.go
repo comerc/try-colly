@@ -29,6 +29,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	{
+		err := os.MkdirAll(path.Join(currentPath, "logs"), 0755)
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+		}
+	}
+
+	{
+		err := os.MkdirAll(path.Join(currentPath, "visited"), 0755)
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+		}
+	}
+
 	argsWithProg := os.Args
 	if len(argsWithProg) != 2 {
 		fmt.Print("need domain")
@@ -37,7 +51,7 @@ func main() {
 	domain := argsWithProg[1]
 
 	log.SetFlags(log.LUTC | log.Ldate | log.Ltime | log.Lshortfile)
-	logFile, err := os.OpenFile(path.Join(currentPath, "log_"+domain+".log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(path.Join(currentPath, "logs", domain+".log"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		fmt.Printf("error opening file: %v", err)
 		os.Exit(1)
@@ -45,7 +59,7 @@ func main() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
-	visitedFilePath := path.Join(currentPath, "visited_"+domain)
+	visitedFilePath := path.Join(currentPath, "visited", domain+".txt")
 	var visited []string
 	if _, err := os.Stat(visitedFilePath); err == nil {
 		data, err := os.ReadFile(visitedFilePath)
@@ -70,7 +84,7 @@ func main() {
 	c.IgnoreRobotsTxt = false
 
 	c.OnRequest(func(r *colly.Request) {
-		log.Printf("Visit to %s\n", r.URL)
+		log.Printf("Visit to %s\n", r.URL.Path)
 	})
 
 	c.OnResponse(func(r *colly.Response) {
@@ -135,7 +149,7 @@ func main() {
 		log.Printf("ERROR: %s", err)
 	})
 
-	c.Visit(fmt.Sprintf("http://%s/", domain))
+	c.Visit(fmt.Sprintf("https://%s/", domain))
 }
 
 func indexOf(slice []string, item string) int {
