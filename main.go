@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -95,7 +97,7 @@ func main() {
 		urlPath := r.Request.URL.Path
 		filePath := strings.Split(urlPath, "/")
 		dirPath := strings.Join(filePath[:len(filePath)-1], "/")
-		fileName := filePath[len(filePath)-1]
+		fileName := strings.TrimRight(filePath[len(filePath)-1], " ")
 		urlQuery := r.Request.URL.RawQuery
 		if urlQuery != "" && substr(urlQuery, 0, len("page")) == "page" {
 			fileName = fileName + "?" + urlQuery
@@ -112,6 +114,36 @@ func main() {
 		}
 		{
 			err := os.WriteFile(path.Join(baseDir, dirPath, fileName), r.Body, 0644)
+			if err != nil {
+				log.Printf("ERROR: %s", err)
+			}
+		}
+		log.Printf("Saved to %s", path.Join(dirPath, fileName))
+	})
+
+	c.OnHTML("img[src]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("src"))
+		URL, err := url.Parse(link)
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+		}
+		urlPath := URL.Path
+		filePath := strings.Split(urlPath, "/")
+		dirPath := strings.Join(filePath[:len(filePath)-1], "/")
+		// if !strings.HasPrefix(dirPath, "/storage/app/media") {
+		// 	return
+		// }
+		fileName := filePath[len(filePath)-1]
+		{
+			err := os.MkdirAll(path.Join(baseDir, dirPath), 0755)
+			if err != nil {
+				log.Printf("ERROR: %s", err)
+			}
+		}
+		// TODO: скачивает несколько раз тот же файл на разных страницах
+		data := downloadFile(link)
+		{
+			err := os.WriteFile(path.Join(baseDir, dirPath, fileName), data, 0644)
 			if err != nil {
 				log.Printf("ERROR: %s", err)
 			}
@@ -173,4 +205,17 @@ func substr(input string, start int, length int) string {
 	}
 
 	return string(asRunes[start : start+length])
+}
+
+func downloadFile(link string) []byte {
+	response, err := http.Get(link)
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	}
+	return data
 }
